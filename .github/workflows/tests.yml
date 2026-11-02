@@ -1,0 +1,23 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      # Extra index = CPU-only torch wheels (much smaller than CUDA); PyPI stays the main index.
+      - run: pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+      # Tests use synthetic images and a tiny random checkpoint, so the NEU dataset is not needed.
+      - run: python -m pytest -q
+        env:
+          MLFLOW_DISABLE_AGENT_HINT: "1"

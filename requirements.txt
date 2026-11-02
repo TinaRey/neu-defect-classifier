@@ -1,13 +1,14 @@
-torch
-torchvision
-pillow
-numpy
-pyyaml
-mlflow
-# API (step 5)
-fastapi
-uvicorn
-python-multipart  # needed by FastAPI to parse image file uploads
+# Pinned to the versions the model was trained and verified with (Python 3.12).
+torch==2.14.1
+torchvision==0.29.2
+pillow==12.3.0
+numpy==2.2.6
+pyyaml==6.0.3
+mlflow==3.17.2
+# API
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32  # needed by FastAPI to parse image file uploads
 # tests
-pytest>=8.0,<8.4
-httpx  # used by FastAPI's TestClient
+pytest==8.3.5
+httpx==0.28.1  # used by FastAPI's TestClient
