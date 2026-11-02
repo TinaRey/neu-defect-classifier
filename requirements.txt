@@ -1,0 +1,6 @@
+torch
+torchvision
+pillow
+numpy
+pyyaml
+pytest>=8.0,<8.4
