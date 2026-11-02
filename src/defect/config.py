@@ -22,7 +22,7 @@ class Config:
     num_workers: int = 0
     device: str = "auto"
 
-    mlflow_tracking_uri: str = "./mlruns"
+    mlflow_tracking_uri: str = "sqlite:///mlflow.db"
     experiment_name: str = "neu-defect-classification"
 
 

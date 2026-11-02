@@ -3,4 +3,11 @@ torchvision
 pillow
 numpy
 pyyaml
+mlflow
+# API (step 5)
+fastapi
+uvicorn
+python-multipart  # needed by FastAPI to parse image file uploads
+# tests
 pytest>=8.0,<8.4
+httpx  # used by FastAPI's TestClient

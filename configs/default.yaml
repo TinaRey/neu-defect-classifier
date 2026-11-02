@@ -15,5 +15,5 @@ weight_decay: 0.0001
 num_workers: 0
 device: auto                    # auto | cpu | cuda | mps
 
-mlflow_tracking_uri: ./mlruns
+mlflow_tracking_uri: sqlite:///mlflow.db   # runs and metrics; artifacts go to ./mlruns
 experiment_name: neu-defect-classification
