@@ -15,23 +15,14 @@ from torch import nn
 
 from defect.config import Config, load_config
 from defect.data import make_loaders
-from defect.model import SimpleCNN
+from defect.evaluate import evaluate_model, format_report
+from defect.model import SimpleCNN, pick_device
 
 
 def set_seed(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)  # seeds CPU and all accelerator RNGs, including weight initialization
-
-
-def pick_device(name: str) -> torch.device:
-    if name != "auto":
-        return torch.device(name)
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
 
 
 def run_epoch(model, loader, loss_fn, device, optimizer=None) -> tuple[float, float]:
@@ -62,6 +53,13 @@ def train(cfg: Config) -> dict:
     model = SimpleCNN(num_classes=len(class_names)).to(device)
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    if cfg.lr_scheduler == "cosine":
+        # Smoothly lowers lr from cfg.lr to ~0 over all epochs: big steps early, fine-tuning late.
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
+    elif cfg.lr_scheduler == "none":
+        scheduler = None
+    else:
+        raise ValueError(f"Unknown lr_scheduler: {cfg.lr_scheduler!r} (use 'cosine' or 'none')")
 
     out_dir = Path(cfg.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -78,11 +76,15 @@ def train(cfg: Config) -> dict:
         for epoch in range(1, cfg.epochs + 1):
             train_loss, train_acc = run_epoch(model, loaders["train"], loss_fn, device, optimizer)
             val_loss, val_acc = run_epoch(model, loaders["val"], loss_fn, device)
-            mlflow.log_metrics({"train_loss": train_loss, "train_acc": train_acc,
-                                "val_loss": val_loss, "val_acc": val_acc}, step=epoch)
+            mlflow.log_metrics({"train_loss": train_loss, "train_acc": train_acc, "val_loss": val_loss,
+                                "val_acc": val_acc, "lr": optimizer.param_groups[0]["lr"]}, step=epoch)
+            if scheduler:
+                scheduler.step()  # once per epoch, after the optimizer has stepped through all batches
             print(f"epoch {epoch:3d} | train loss {train_loss:.4f} acc {train_acc:.3f} "
                   f"| val loss {val_loss:.4f} acc {val_acc:.3f}")
 
+            # Possible improvement: select on val_loss (smoother than accuracy on 270 images, and
+            # it uses the probabilities). Ties in accuracy currently keep the earliest epoch.
             if val_acc > best_val_acc:  # model selection uses VALIDATION only; test is untouched until the end
                 best_val_acc = val_acc
                 # Everything inference needs lives in one file: weights, class order, preprocessing stats.
@@ -94,9 +96,14 @@ def train(cfg: Config) -> dict:
         ckpt = torch.load(ckpt_path, map_location=device)
         model.load_state_dict(ckpt["model_state"])
         test_loss, test_acc = run_epoch(model, loaders["test"], loss_fn, device)
-        mlflow.log_metrics({"best_val_acc": best_val_acc, "test_loss": test_loss, "test_acc": test_acc})
+        report = evaluate_model(model, loaders["test"], class_names, device)
+        mlflow.log_metrics({"best_val_acc": best_val_acc, "test_loss": test_loss, "test_acc": test_acc,
+                            "test_macro_f1": report["macro_f1"],
+                            **{f"test_recall_{c}": m["recall"] for c, m in report["per_class"].items()}})
+        mlflow.log_dict(report, "test_report.json")
         mlflow.log_artifact(str(ckpt_path))
         mlflow.log_artifact(cfg.splits_path)
+        print(format_report(report))
         print(f"best epoch {ckpt['epoch']} (val acc {best_val_acc:.3f}) | test loss {test_loss:.4f} acc {test_acc:.3f}")
 
     return {"best_val_acc": best_val_acc, "test_acc": test_acc, "checkpoint": str(ckpt_path)}

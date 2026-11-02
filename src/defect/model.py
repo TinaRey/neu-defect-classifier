@@ -29,3 +29,13 @@ class SimpleCNN(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # x: (N, C, H, W)
         x = self.pool(self.features(x))  # (N, widths[-1], 1, 1)
         return self.classifier(torch.flatten(x, 1))  # (N, num_classes)
+
+
+def pick_device(name: str) -> torch.device:
+    if name != "auto":
+        return torch.device(name)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")

@@ -16,8 +16,9 @@ class Config:
     seed: int = 42
 
     batch_size: int = 32
-    epochs: int = 20
+    epochs: int = 50
     lr: float = 1e-3
+    lr_scheduler: str = "cosine"  # cosine | none
     weight_decay: float = 1e-4
     num_workers: int = 0
     device: str = "auto"

@@ -9,8 +9,9 @@ test_frac: 0.15
 seed: 42
 
 batch_size: 32
-epochs: 20
+epochs: 50
 lr: 0.001
+lr_scheduler: cosine            # cosine | none
 weight_decay: 0.0001
 num_workers: 0
 device: auto                    # auto | cpu | cuda | mps
