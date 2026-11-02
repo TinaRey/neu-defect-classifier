@@ -1,4 +1,4 @@
-"""Train SimpleCNN, keep the best checkpoint by validation accuracy, track with MLflow.
+"""Train SimpleCNN, keep the best checkpoint by validation loss, track with MLflow.
 
 Usage:
     python -m defect.train --config configs/default.yaml --epochs 30 --lr 0.0005
@@ -72,7 +72,7 @@ def train(cfg: Config) -> dict:
         mlflow.log_params({"resolved_device": str(device), "n_parameters": sum(p.numel() for p in model.parameters()),
                            **{f"n_{k}": len(v.dataset) for k, v in loaders.items()}})
 
-        best_val_acc = -1.0
+        best_val_loss, val_acc_at_best = float("inf"), 0.0
         for epoch in range(1, cfg.epochs + 1):
             train_loss, train_acc = run_epoch(model, loaders["train"], loss_fn, device, optimizer)
             val_loss, val_acc = run_epoch(model, loaders["val"], loss_fn, device)
@@ -83,30 +83,30 @@ def train(cfg: Config) -> dict:
             print(f"epoch {epoch:3d} | train loss {train_loss:.4f} acc {train_acc:.3f} "
                   f"| val loss {val_loss:.4f} acc {val_acc:.3f}")
 
-            # Possible improvement: select on val_loss (smoother than accuracy on 270 images, and
-            # it uses the probabilities). Ties in accuracy currently keep the earliest epoch.
-            if val_acc > best_val_acc:  # model selection uses VALIDATION only; test is untouched until the end
-                best_val_acc = val_acc
+            # Select on validation loss: smoother than accuracy on a small val set (270 images), it uses
+            # the predicted probabilities, and it rarely ties. VALIDATION only; test is untouched until the end.
+            if val_loss < best_val_loss:
+                best_val_loss, val_acc_at_best = val_loss, val_acc
                 # Everything inference needs lives in one file: weights, class order, preprocessing stats.
                 torch.save({"model_state": model.state_dict(), "class_names": class_names,
                             "mean": mean, "std": std, "image_size": cfg.image_size,
-                            "epoch": epoch, "val_acc": val_acc, "config": asdict(cfg)}, ckpt_path)
+                            "epoch": epoch, "val_loss": val_loss, "val_acc": val_acc, "config": asdict(cfg)}, ckpt_path)
 
         # Reload the best weights (not the last epoch's) and evaluate on test exactly once.
         ckpt = torch.load(ckpt_path, map_location=device)
         model.load_state_dict(ckpt["model_state"])
         test_loss, test_acc = run_epoch(model, loaders["test"], loss_fn, device)
         report = evaluate_model(model, loaders["test"], class_names, device)
-        mlflow.log_metrics({"best_val_acc": best_val_acc, "test_loss": test_loss, "test_acc": test_acc,
+        mlflow.log_metrics({"best_val_loss": best_val_loss, "val_acc_at_best": val_acc_at_best, "test_loss": test_loss, "test_acc": test_acc,
                             "test_macro_f1": report["macro_f1"],
                             **{f"test_recall_{c}": m["recall"] for c, m in report["per_class"].items()}})
         mlflow.log_dict(report, "test_report.json")
         mlflow.log_artifact(str(ckpt_path))
         mlflow.log_artifact(cfg.splits_path)
         print(format_report(report))
-        print(f"best epoch {ckpt['epoch']} (val acc {best_val_acc:.3f}) | test loss {test_loss:.4f} acc {test_acc:.3f}")
+        print(f"best epoch {ckpt['epoch']} (val loss {best_val_loss:.4f}, acc {val_acc_at_best:.3f}) | test loss {test_loss:.4f} acc {test_acc:.3f}")
 
-    return {"best_val_acc": best_val_acc, "test_acc": test_acc, "checkpoint": str(ckpt_path)}
+    return {"best_val_loss": best_val_loss, "val_acc_at_best": val_acc_at_best, "test_acc": test_acc, "checkpoint": str(ckpt_path)}
 
 
 def parse_args() -> tuple[str, dict]:

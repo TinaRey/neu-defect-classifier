@@ -1,7 +1,22 @@
 [project]
 name = "defect"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.162.0",
+    "mlflow==3.17.2",
+    "numpy==2.2.6",
+    "pillow==12.3.0",
+    "python-multipart==0.0.32",
+    "pyyaml==6.0.3",
+    "torch==2.14.1",
+    "torchvision==0.29.2",
+    "uvicorn==0.54.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -9,3 +24,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "pytest==8.3.5",
+]

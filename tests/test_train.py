@@ -31,7 +31,7 @@ def test_same_seed_gives_same_results(tmp_path, fake_dataset, monkeypatch):
         (tmp_path / name).mkdir()
         results.append(train(tiny_config(tmp_path / name, fake_dataset, seed=7)))
     a, b = results
-    assert a["best_val_acc"] == b["best_val_acc"] and a["test_acc"] == b["test_acc"]
+    assert a["best_val_loss"] == b["best_val_loss"] and a["test_acc"] == b["test_acc"]
 
 
 def test_set_seed_makes_init_reproducible():

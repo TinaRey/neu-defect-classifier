@@ -23,21 +23,21 @@ Dockerfile, requirements*.txt, .github/workflows/tests.yml
 
 ## Setup
 ```bash
-# Python 3.12; dependency versions are pinned to the ones the model was trained with
-python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync        # creates .venv with Python 3.12 and the pinned dependencies from pyproject.toml / uv.lock
 ```
+Commands below are run through `uv run`, which uses the project environment (no activation needed).
+`requirements*.txt` mirror the same pins for the Dockerfile and CI, which use plain pip: when you
+change a dependency (`uv add ...`), update them too.
 The dataset is **not downloaded automatically**. Place it so that images are at
 `<data_dir>/<split>/images/<class>/*.jpg` (the official NEU-DET layout) and set `data_dir` in
 `configs/default.yaml` (default `../NEU-DET`). The dataset's own train/validation split is ignored.
 
 ## Train and evaluate
 ```bash
-export PYTHONPATH=src            # or: pip install -e .
-python -m defect.train --config configs/default.yaml                # any config field can be overridden
-python -m defect.train --epochs 30 --lr 0.0005 --lr_scheduler none
-python -m defect.evaluate --checkpoint artifacts/best.pt            # test-set report
-mlflow ui --backend-store-uri sqlite:///mlflow.db                   # browse runs
+uv run python -m defect.train --config configs/default.yaml                # any config field can be overridden
+uv run python -m defect.train --epochs 30 --lr 0.0005 --lr_scheduler none
+uv run python -m defect.evaluate --checkpoint artifacts/best.pt            # test-set report
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db                   # browse runs
 ```
 Outputs: `artifacts/best.pt` (weights, class names, image size, train mean/std), `artifacts/splits.json`
 (the fixed split, reused by every run), and an MLflow run with params, per-epoch train/val metrics,
@@ -45,7 +45,7 @@ test metrics and artifacts.
 
 ## Serve
 ```bash
-MODEL_PATH=artifacts/best.pt uvicorn defect.api:app --port 8000
+MODEL_PATH=artifacts/best.pt uv run uvicorn defect.api:app --port 8000
 curl -F "file=@image.jpg" localhost:8000/predict
 # {"predicted_class":"crazing","confidence":0.993,"probabilities":{"crazing":0.993,...}}
 ```
@@ -60,7 +60,7 @@ The checkpoint is mounted, not baked into the image, so the same image serves an
 
 ## Tests
 ```bash
-python -m pytest -q
+uv run pytest -q
 ```
 CI (`.github/workflows/tests.yml`) runs the same command on every push and pull request.
 
@@ -72,17 +72,17 @@ CI (`.github/workflows/tests.yml`) runs the same command on every push and pull 
   into tensors; a test checks that the API output equals a direct model call.
 - **Model:** 4 x (Conv3x3 -> ReLU -> MaxPool) -> AdaptiveAvgPool -> Linear, about 98k parameters.
   It returns logits; softmax is applied only at inference.
-- **Model selection:** best epoch by validation accuracy; the test set plays no part in it.
+- **Model selection:** best epoch by validation loss (smoother than accuracy on a small validation set);
+  the test set plays no part in it.
 
 ## Results (seed 42, 50 epochs, cosine LR)
-Best validation accuracy 97.4% (epoch 32); **test accuracy 94.8%, macro-F1 0.948** on 270 images
-(95% CI roughly +/-2.6 points). The weakest class is `pitted_surface` (recall 0.84), mostly confused
-with `inclusion`.
+Best validation loss 0.0754 at epoch 48 (val accuracy 96.3%); **test accuracy 94.8%, macro-F1 0.948,
+test loss 0.157** on 270 images (95% CI roughly +/-2.6 points). The weakest class is `pitted_surface`
+(recall 0.87), mostly confused with `inclusion`.
 
 ## Known limitations / ideas for later
 - Small test set and a single seed: report mean +/- std over several seeds or k-fold CV.
 - Probability calibration is unchecked: treat API probabilities as scores, not true confidences.
 - No defect-free class in NEU, so defective-vs-OK recall (a missed defect is the costly error) cannot
   be measured; add defect-free images to measure it.
-- Select the best epoch by validation loss instead of accuracy.
 - Possible accuracy gains: BatchNorm, a wider network, rotation augmentation.
