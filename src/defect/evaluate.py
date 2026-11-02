@@ -19,8 +19,7 @@ from torch.utils.data import DataLoader
 
 from defect.config import load_config
 from defect.data import DefectDataset, load_or_create_splits
-from defect.model import SimpleCNN, pick_device
-from defect.transforms import build_transform
+from defect.model import load_checkpoint, pick_device
 
 
 @torch.no_grad()  # no gradients needed to evaluate
@@ -79,15 +78,11 @@ if __name__ == "__main__":
 
     cfg = load_config(args.config)
     device = pick_device(cfg.device)
-    ckpt = torch.load(args.checkpoint, map_location=device)
-    model = SimpleCNN(num_classes=len(ckpt["class_names"])).to(device)
-    model.load_state_dict(ckpt["model_state"])
-
-    # Use the preprocessing stats stored with the checkpoint, exactly as inference will.
+    # Same loader as the API, so evaluation uses the preprocessing stats stored with the checkpoint.
+    model, class_names, transform = load_checkpoint(args.checkpoint, device)
     samples = load_or_create_splits(cfg)[args.split]
-    ds = DefectDataset(cfg.data_dir, samples, ckpt["class_names"],
-                       build_transform(ckpt["image_size"], ckpt["mean"], ckpt["std"]))
-    report = evaluate_model(model, DataLoader(ds, batch_size=cfg.batch_size), ckpt["class_names"], device)
+    ds = DefectDataset(cfg.data_dir, samples, class_names, transform)
+    report = evaluate_model(model, DataLoader(ds, batch_size=cfg.batch_size), class_names, device)
     print(format_report(report))
     out = f"{cfg.output_dir}/{args.split}_report.json"
     with open(out, "w") as f:

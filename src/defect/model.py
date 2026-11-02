@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+from defect.transforms import build_transform
+
 
 def conv_block(in_ch: int, out_ch: int) -> nn.Sequential:
     return nn.Sequential(
@@ -39,3 +41,17 @@ def pick_device(name: str) -> torch.device:
     if torch.backends.mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")
+
+
+def load_checkpoint(path, device="cpu"):
+    """Rebuild everything inference needs from the single checkpoint file written by training.
+
+    Shared by the API and evaluate.py so preprocessing and architecture can't drift apart.
+    """
+    ckpt = torch.load(path, map_location=device)
+    model = SimpleCNN(num_classes=len(ckpt["class_names"])).to(device)
+    model.load_state_dict(ckpt["model_state"])
+    model.eval()  # inference mode for layers; callers also disable gradients
+    # Same function training used, with the TRAIN-set mean/std saved in the checkpoint.
+    transform = build_transform(ckpt["image_size"], ckpt["mean"], ckpt["std"])
+    return model, ckpt["class_names"], transform

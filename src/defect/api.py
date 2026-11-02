@@ -12,8 +12,7 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel
 
-from defect.model import SimpleCNN
-from defect.transforms import build_transform
+from defect.model import load_checkpoint
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
@@ -24,21 +23,10 @@ class Prediction(BaseModel):
     probabilities: dict[str, float]
 
 
-def load_model(path: str):
-    """Rebuild everything inference needs from the single checkpoint file written by training."""
-    ckpt = torch.load(path, map_location="cpu")
-    model = SimpleCNN(num_classes=len(ckpt["class_names"]))
-    model.load_state_dict(ckpt["model_state"])
-    model.eval()  # inference mode for layers; we also disable gradients at call time
-    # Same function training used, with the TRAIN-set mean/std saved in the checkpoint.
-    transform = build_transform(ckpt["image_size"], ckpt["mean"], ckpt["std"])
-    return model, ckpt["class_names"], transform
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load once at startup, not per request. Path is read here (not at import) so tests can set it.
-    app.state.model, app.state.class_names, app.state.transform = load_model(
+    app.state.model, app.state.class_names, app.state.transform = load_checkpoint(
         os.environ.get("MODEL_PATH", "artifacts/best.pt"))
     yield
 
