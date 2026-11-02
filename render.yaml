@@ -1,0 +1,9 @@
+# Render Blueprint: New + > Blueprint, then pick this repo.
+services:
+  - type: web
+    name: neu-defect-api
+    runtime: docker          # builds ./Dockerfile
+    plan: free               # 512 MB; the API used ~256 MB in local tests. Use `starter` if it runs out of memory
+    region: frankfurt
+    healthCheckPath: /health
+    autoDeployTrigger: commit

@@ -54,9 +54,18 @@ curl -F "file=@image.jpg" localhost:8000/predict
 ### Docker
 ```bash
 docker build -t neu-defect .
-docker run -p 8000:8000 -v "$PWD/artifacts/best.pt:/models/best.pt:ro" neu-defect
+docker run -p 8000:8000 neu-defect
 ```
-The checkpoint is mounted, not baked into the image, so the same image serves any trained model.
+The checkpoint `model/best.pt` (about 400 KB) is versioned in the repo and baked into the image. To serve
+a different one, mount it and set `MODEL_PATH`, e.g. `-v "$PWD/artifacts/best.pt:/m/best.pt:ro" -e MODEL_PATH=/m/best.pt`.
+After retraining, copy `artifacts/best.pt` to `model/best.pt` to update what gets deployed.
+
+### Deploy on Render
+`render.yaml` is a Render Blueprint. In the Render dashboard: **New > Blueprint**, connect this GitHub repo,
+and apply. Render builds the Dockerfile (a few minutes), injects `PORT`, and checks `/health`.
+- The free plan has 512 MB RAM (the API used about 256 MB locally) and spins down after ~15 minutes idle,
+  so the first request afterwards takes several seconds while torch loads. Use `plan: starter` to avoid that.
+- Try it: `curl -F "file=@image.jpg" https://<your-service>.onrender.com/predict`
 
 ## Tests
 ```bash
