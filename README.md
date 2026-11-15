@@ -1,7 +1,7 @@
 # NEU Surface Defect Classifier
 
 A small PyTorch CNN that classifies steel-surface defects (6 classes) from the
-[NEU surface defect database](http://faculty.neu.edu.cn/songkechen/zh_CN/zhuanti/258646/), with
+[NEU surface defect database](https://www.kaggle.com/datasets/kaustubhdikshit/neu-surface-defect-database), with
 MLflow tracking, a FastAPI inference service, tests, a Dockerfile and CI.
 
 Classes: `crazing`, `inclusion`, `patches`, `pitted_surface`, `rolled-in_scale`, `scratches`.
