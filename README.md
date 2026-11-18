@@ -65,7 +65,7 @@ After retraining, copy `artifacts/best.pt` to `model/best.pt` to update what get
 and apply. Render builds the Dockerfile (a few minutes), injects `PORT`, and checks `/health`.
 - The free plan has 512 MB RAM (the API used about 256 MB locally) and spins down after ~15 minutes idle,
   so the first request afterwards takes several seconds while torch loads. Use `plan: starter` to avoid that.
-- Try it: `curl -F "file=@image.jpg" https://<your-service>.onrender.com/predict`
+- Try it: `curl -F "file=@image.jpg" https://<your-service>.onrender.com/predict` or [here](https://neu-defect-api.onrender.com/docs#/default/predict_predict_post).
 
 ## Tests
 ```bash
